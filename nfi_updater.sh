@@ -114,7 +114,7 @@ else
   cp "$oldStrategyPath1" "$tempOldStratPath"
 fi
 
-# change name in the file because we don't want to compare name
+# delete name in the file because we don't want to compare name
 sed -i "/NostalgiaForInfinityNext/d" "$tempNewStratPath"
 sed -i "/NostalgiaForInfinityNext/d" "$tempOldStratPath"
 
