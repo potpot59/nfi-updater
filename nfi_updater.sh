@@ -20,6 +20,7 @@
 #   - If the results do not respect a certain threshold the update is canceled and a message is sent via telegram
 # - Git: commit, push... (freqtrade installation on private git repo)
 # - Docker: Update the docker-compose.yml file, then restart the bots
+#   - Will restart "at the middle candle" because we are running on a timeframe of 5m (2m, 7m, 12m, 17m...)
 # - A message is sent via telegram:
 #   - With the results of the backtest (if new version)
 #   - If the update was successful
@@ -57,7 +58,7 @@ backtestResultDirectory="backtest_result"
 backtestTimerange="20210612-20210812"
 previousNfiStrategyPath="/tmp/previous_nfi_strategy.py"
 
-backtestMinimumAvgProfit="2.50"
+backtestMinimumAvgProfit="2.40"
 backtestMinimumWinPercentage="95"
 backtestMaximumDrawdown="30"
 
@@ -154,11 +155,17 @@ source ./.env/bin/activate
 # run backtest
 echo "Running backtest..."
 
+# create backtest result directory
 mkdir -p "$backtestResultDirectory"
 backtestResultPath="$backtestResultDirectory/$newStrategyName"
 
-# 134 Pairs (home-made) / Binance / USDT / max-open-trades 10 / stake_amount: $100 / wallet $1000
-freqtrade backtesting -c ./user_data/config.json -c ./common-config.json --fee 0.00075 --timerange=$backtestTimerange --timeframe 5m --max-open-trades 10 --dry-run-wallet 1000 --stake-amount 100 --strategy-list "$newStrategyName" "$oldStrategyName" > "$backtestResultPath" 2>/dev/null
+# ensure old strategy is in the default strategy directory
+cp "$oldStrategyPath1" "$defaultStrategiesDirectory"
+
+echo "###########################################################################"
+# Binance / USDT / max-open-trades 10 / stake_amount: $100 / wallet $1000
+freqtrade backtesting -c ./user_data/config.json -c ./common-config.json --fee 0.00075 --timerange=$backtestTimerange --timeframe 5m --max-open-trades 10 --dry-run-wallet 1000 --stake-amount 100 --strategy-list "$newStrategyName" "$oldStrategyName" > "$backtestResultPath"
+echo "###########################################################################"
 
 # cleanup backtest results (we have the output in $backtestResultPath)
 /bin/rm -f ./user_data/backtest_results/.last_result.json
@@ -294,11 +301,32 @@ git pull -q &&
 
 ########################################## DOCKER ##########################################
 
-echo "Docker build and restart..."
+echo "Docker build..."
 
 /usr/local/bin/docker-compose pull > /dev/null &&
-  /usr/local/bin/docker-compose build --no-cache > /dev/null &&
-  /usr/local/bin/docker-compose stop > /dev/null &&
+  /usr/local/bin/docker-compose build --no-cache > /dev/null
+
+# MIDDLE CANDLE PROTECTION
+# Will restart "at the middle candle" because we are running on a timeframe of 5m (2m, 7m, 12m, 17m...)
+currentMinute=$(date +'%M')
+currentMinuteDiff=99 # fake large number to simplify the algorithm
+for i in $(seq 2 5 62); do # 62 allows to manage the minutes after 57
+  minuteDiff=$(echo "$i - $currentMinute" | bc);
+  if (( $(echo "$minuteDiff >= 0 && $minuteDiff < $currentMinuteDiff" | bc -l) )); then
+    currentMinuteDiff=$minuteDiff
+    currentMinuteWeWait=$i
+  fi
+done
+echo "We have to wait $currentMinuteDiff minute(s) to restart the bot at $currentMinuteWeWait"
+if (( $(echo "$currentMinuteDiff > 0" | bc -l) )); then
+  sleepTime="$((currentMinuteDiff*60))"
+  echo "go sleep for $sleepTime seconds"
+  sleep "$sleepTime"
+fi
+
+echo "Docker restart..."
+
+/usr/local/bin/docker-compose stop > /dev/null &&
   /usr/local/bin/docker-compose up -d --remove-orphans > /dev/null &&
   docker system prune --volumes -af > /dev/null
 
