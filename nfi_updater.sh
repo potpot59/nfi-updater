@@ -15,13 +15,13 @@
 # - Update freqtrade
 # - Customize the strategy ('has_downtime_protection = True' for example)
 # - Perform a comparative backtest between the new strategy and the current strategy
-#   - The result is saved in /backtest_result folder and sent via telegram
-#   - If there is an error during the backtest the update is canceled and a message is sent via telegram
-#   - If the results do not respect a certain threshold the update is canceled and a message is sent via telegram
+#   - The result is saved in /backtest_result folder and sent via Telegram
+#   - If there is an error during the backtest the update is canceled and a message is sent via Telegram
+#   - If the results do not respect a certain threshold the update is canceled and a message is sent via Telegram
 # - Git: commit, push... (freqtrade installation on private git repo)
 # - Docker: Update the docker-compose.yml file, then restart the bots
 #   - Will restart "at the middle candle" because we are running on a timeframe of 5m (2m, 7m, 12m, 17m...)
-# - A message is sent via telegram:
+# - A message is sent via Telegram:
 #   - With the results of the backtest (if new version)
 #   - If the update was successful
 #   - If the update is canceled because there is an error during the backtest
